@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>設定 - タブ管理</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div id="container">
+      <h1>拡張機能の設定</h1>
+      <section id="sectionThreshold" class="section">
+        <label for="optThreshold">タブ上限:</label>
+        <input id="optThreshold" type="number" min="1" step="1" />
+      </section>
+      <section id="sectionDiscard" class="section">
+        <label><input type="checkbox" id="optDiscard" /> タブを閉じる代わりに休止状態にする</label>
+      </section>
+      <section id="sectionWhitelist" class="section">
+        <h2>ホワイトリスト</h2>
+        <p>自動で閉じられないドメインを 1 行につき 1 ドメインで入力してください。</p>
+        <textarea id="optWhitelist" rows="6"></textarea>
+      </section>
+      <button id="optSave">保存</button>
+      <div id="optStatus" class="status" aria-live="polite"></div>
+    </div>
+    <script src="options.js"></script>
+  </body>
+</html>

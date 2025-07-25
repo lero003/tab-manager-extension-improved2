@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Advanced Tab Manager & Session Saver",
+  "description": "Organize your tabs, automatically trim excess tabs, save browsing sessions and restore them later.",
+  "version": "1.0",
+  "permissions": [
+    "tabs",
+    "storage",
+    "tabGroups",
+    "sessions",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "commands": {
+    "group-by-domain": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+G"
+      },
+      "description": "ドメイン別にグループ化"
+    },
+    "save-session": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "セッションを保存"
+    },
+    "remove-duplicates": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D"
+      },
+      "description": "重複タブを閉じる"
+    }
+  },
+  "action": {
+    "default_title": "Tab Manager",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

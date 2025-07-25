@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tab Manager</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="container">
+      <h1 id="header">タブ管理</h1>
+      <div id="summary" class="section">
+        <div class="summary-item">
+          <span class="label">開いているタブ:</span>
+          <span id="totalTabs">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">重複しているタブ:</span>
+          <span id="duplicateTabs">0</span>
+        </div>
+      </div>
+      <div id="threshold" class="section">
+        <label for="thresholdInput">タブ上限:</label>
+        <input type="number" id="thresholdInput" min="1" step="1" />
+        <button id="updateThresholdBtn">更新</button>
+      </div>
+      <div id="actions" class="section">
+        <button id="groupBtn">ドメイン別にグループ化</button>
+        <button id="removeDupBtn">重複タブを閉じる</button>
+        <button id="saveSessionBtn">セッションを保存</button>
+        <button id="importSessionBtn">セッションをインポート</button>
+        <button id="exportCurrentBtn">現在のタブをエクスポート</button>
+      </div>
+      <!-- Hidden file input for importing sessions -->
+      <input type="file" id="importFile" accept=".json" style="display: none;" />
+      <div id="sessionListContainer" class="section">
+        <div class="section-title">保存されたセッション</div>
+        <ul id="sessionList"></ul>
+      </div>
+
+      <div id="statsContainer" class="section">
+        <div class="section-title">利用時間トップ5</div>
+        <ul id="domainStats"></ul>
+      </div>
+
+      <div id="optionsLink" class="section">
+        <a href="#" id="openOptions">設定を開く</a>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

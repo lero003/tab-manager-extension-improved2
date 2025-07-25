@@ -1,0 +1,164 @@
+/*
+ * Styles for the Tab Manager popup.
+ */
+
+body {
+  font-family: sans-serif;
+  font-size: 14px;
+  margin: 0;
+  padding: 0;
+  width: 360px;
+  box-sizing: border-box;
+}
+
+#container {
+  padding: 10px;
+}
+
+h1#header {
+  font-size: 18px;
+  margin: 0 0 10px 0;
+  text-align: center;
+}
+
+.section {
+  margin-bottom: 12px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.summary-item .label {
+  font-weight: bold;
+}
+
+#threshold label {
+  margin-right: 4px;
+}
+
+#threshold input {
+  width: 60px;
+  padding: 2px;
+  margin-right: 4px;
+}
+
+button {
+  padding: 6px 8px;
+  margin: 2px 0;
+  border: none;
+  border-radius: 4px;
+  background-color: #4285f4;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover {
+  background-color: #357ae8;
+}
+
+button:disabled {
+  background-color: #a0c5f9;
+  cursor: default;
+}
+
+.section-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+#sessionList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+#sessionList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-bottom: 1px solid #eee;
+}
+
+#sessionList li:last-child {
+  border-bottom: none;
+}
+
+#domainStats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+#domainStats li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+
+#domainStats li:last-child {
+  border-bottom: none;
+}
+
+#optionsLink {
+  text-align: right;
+}
+
+#optionsLink a {
+  font-size: 12px;
+  color: #0066cc;
+  text-decoration: none;
+}
+
+#optionsLink a:hover {
+  text-decoration: underline;
+}
+
+#sessionList .session-name {
+  flex: 1;
+  margin-right: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sessionList button {
+  background-color: #6c757d;
+  color: white;
+  font-size: 12px;
+  margin-left: 4px;
+  padding: 4px 6px;
+}
+
+#sessionList button.restore {
+  background-color: #28a745;
+}
+
+#sessionList button.delete {
+  background-color: #dc3545;
+}
+
+#sessionList button.export {
+  background-color: #17a2b8;
+}
+
+.status {
+  font-size: 12px;
+  color: #555;
+  margin-top: 8px;
+  height: 16px;
+}
