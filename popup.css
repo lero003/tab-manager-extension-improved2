@@ -2,18 +2,27 @@
  * Styles for the Tab Manager popup.
  */
 
+:root {
+  --bg: #ffffff;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+}
+
+* { box-sizing: border-box; }
+
 body {
-  font-family: sans-serif;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 14px;
   margin: 0;
   padding: 0;
-  width: 360px;
+  width: 380px;
   box-sizing: border-box;
+  background: var(--bg);
 }
 
-#container {
-  padding: 10px;
-}
+#container { padding: 12px; }
 
 h1#header {
   font-size: 18px;
@@ -21,53 +30,47 @@ h1#header {
   text-align: center;
 }
 
-.section {
-  margin-bottom: 12px;
-}
+.section { margin-bottom: 12px; }
 
 .summary-item {
   display: flex;
   justify-content: space-between;
   margin-bottom: 4px;
 }
+.summary-item .label { font-weight: 600; }
 
-.summary-item .label {
-  font-weight: bold;
-}
-
-#threshold label {
-  margin-right: 4px;
-}
-
+#threshold label { margin-right: 6px; }
 #threshold input {
-  width: 60px;
-  padding: 2px;
-  margin-right: 4px;
+  width: 70px;
+  padding: 6px 8px;
+  margin-right: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 button {
-  padding: 6px 8px;
+  padding: 8px 10px;
   margin: 2px 0;
   border: none;
-  border-radius: 4px;
-  background-color: #4285f4;
+  border-radius: 8px;
+  background-color: var(--primary);
   color: white;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
 }
-
-button:hover {
-  background-color: #357ae8;
-}
-
-button:disabled {
-  background-color: #a0c5f9;
-  cursor: default;
-}
+button:hover { background-color: var(--primary-hover); }
+button:disabled { background-color: #a0c5f9; cursor: default; }
 
 .section-title {
-  font-weight: bold;
-  margin-bottom: 4px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 #sessionList {
@@ -76,21 +79,18 @@ button:disabled {
   margin: 0;
   max-height: 180px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 #sessionList li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-bottom: 1px solid #eee;
 }
-
-#sessionList li:last-child {
-  border-bottom: none;
-}
+#sessionList li:last-child { border-bottom: none; }
 
 #domainStats {
   list-style: none;
@@ -98,35 +98,25 @@ button:disabled {
   margin: 0;
   max-height: 140px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
-
 #domainStats li {
   display: flex;
   justify-content: space-between;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-bottom: 1px solid #eee;
   font-size: 13px;
 }
+#domainStats li:last-child { border-bottom: none; }
 
-#domainStats li:last-child {
-  border-bottom: none;
-}
-
-#optionsLink {
-  text-align: right;
-}
-
+#optionsLink { text-align: right; }
 #optionsLink a {
   font-size: 12px;
   color: #0066cc;
   text-decoration: none;
 }
-
-#optionsLink a:hover {
-  text-decoration: underline;
-}
+#optionsLink a:hover { text-decoration: underline; }
 
 #sessionList .session-name {
   flex: 1;
@@ -137,28 +127,41 @@ button:disabled {
 }
 
 #sessionList button {
-  background-color: #6c757d;
+  background-color: #6b7280;
   color: white;
   font-size: 12px;
   margin-left: 4px;
-  padding: 4px 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
 }
-
-#sessionList button.restore {
-  background-color: #28a745;
-}
-
-#sessionList button.delete {
-  background-color: #dc3545;
-}
-
-#sessionList button.export {
-  background-color: #17a2b8;
-}
+#sessionList button.restore { background-color: #22c55e; }
+#sessionList button.delete { background-color: #ef4444; }
+#sessionList button.export { background-color: #06b6d4; }
 
 .status {
   font-size: 12px;
   color: #555;
   margin-top: 8px;
-  height: 16px;
+  min-height: 16px;
+}
+
+/* Progress bar */
+#progressWrap {
+  height: 10px;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+#progressFill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #93c5fd, #2563eb);
+  transition: width .25s ease;
+}
+.hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+#policyRadios label {
+  margin-right: 10px;
+  font-weight: 500;
 }

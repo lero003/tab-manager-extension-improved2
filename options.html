@@ -8,18 +8,32 @@
   <body>
     <div id="container">
       <h1>拡張機能の設定</h1>
-      <section id="sectionThreshold" class="section">
-        <label for="optThreshold">タブ上限:</label>
-        <input id="optThreshold" type="number" min="1" step="1" />
+
+      <section id="sectionPolicy" class="section card">
+        <h2>上限超過時の挙動</h2>
+        <label class="radio"><input type="radio" name="policy" value="block"> 新規タブ作成をブロック</label>
+        <label class="radio"><input type="radio" name="policy" value="trim"> 古いタブを自動で閉じる</label>
+        <p class="hint">※ ブロック中はツールバーアイコンに <strong>MAX</strong> と表示されます。</p>
       </section>
-      <section id="sectionDiscard" class="section">
-        <label><input type="checkbox" id="optDiscard" /> タブを閉じる代わりに休止状態にする</label>
+
+      <section id="sectionThreshold" class="section card">
+        <h2>タブ上限</h2>
+        <div class="inline">
+          <label for="optThreshold">上限値:</label>
+          <input id="optThreshold" type="number" min="1" step="1" />
+        </div>
       </section>
-      <section id="sectionWhitelist" class="section">
+
+      <section id="sectionDiscard" class="section card">
+        <label><input type="checkbox" id="optDiscard" /> タブを閉じる代わりに休止状態にする（「古いタブを閉じる」モード時のみ）</label>
+      </section>
+
+      <section id="sectionWhitelist" class="section card">
         <h2>ホワイトリスト</h2>
-        <p>自動で閉じられないドメインを 1 行につき 1 ドメインで入力してください。</p>
-        <textarea id="optWhitelist" rows="6"></textarea>
+        <p>自動処理の対象外とするドメインを 1 行につき 1 ドメインで入力してください。</p>
+        <textarea id="optWhitelist" rows="6" placeholder="example.com&#10;intranet.local"></textarea>
       </section>
+
       <button id="optSave">保存</button>
       <div id="optStatus" class="status" aria-live="polite"></div>
     </div>

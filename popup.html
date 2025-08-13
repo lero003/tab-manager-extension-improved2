@@ -8,30 +8,42 @@
   <body>
     <div id="container">
       <h1 id="header">タブ管理</h1>
-      <div id="summary" class="section">
-        <div class="summary-item">
-          <span class="label">開いているタブ:</span>
-          <span id="totalTabs">0</span>
+
+      <div id="usage" class="section">
+        <div id="usageTop">
+          <div class="summary-item"><span class="label">開いているタブ:</span><span id="totalTabs">0</span></div>
+          <div class="summary-item"><span class="label">重複しているタブ:</span><span id="duplicateTabs">0</span></div>
         </div>
-        <div class="summary-item">
-          <span class="label">重複しているタブ:</span>
-          <span id="duplicateTabs">0</span>
+        <div id="progressWrap" aria-label="tab-usage">
+          <div id="progressFill"></div>
         </div>
+        <div id="usageHint" class="hint"></div>
       </div>
+
       <div id="threshold" class="section">
         <label for="thresholdInput">タブ上限:</label>
         <input type="number" id="thresholdInput" min="1" step="1" />
         <button id="updateThresholdBtn">更新</button>
       </div>
-      <div id="actions" class="section">
+
+      <div id="policy" class="section">
+        <span class="section-title">上限超過時の挙動</span>
+        <div id="policyRadios">
+          <label><input type="radio" name="policy" value="block"> ブロック</label>
+          <label><input type="radio" name="policy" value="trim"> 古いタブを閉じる</label>
+        </div>
+        <button id="updatePolicyBtn">切り替え</button>
+      </div>
+
+      <div id="actions" class="section grid">
         <button id="groupBtn">ドメイン別にグループ化</button>
         <button id="removeDupBtn">重複タブを閉じる</button>
         <button id="saveSessionBtn">セッションを保存</button>
         <button id="importSessionBtn">セッションをインポート</button>
-        <button id="exportCurrentBtn">現在のタブをエクスポート</button>
       </div>
-      <!-- Hidden file input for importing sessions -->
+
       <input type="file" id="importFile" accept=".json" style="display: none;" />
+
       <div id="sessionListContainer" class="section">
         <div class="section-title">保存されたセッション</div>
         <ul id="sessionList"></ul>

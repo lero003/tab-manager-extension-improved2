@@ -2,17 +2,22 @@
 // Handles reading and saving preferences from the options page.
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Load existing settings
-  const data = await chrome.storage.local.get(['tabThreshold', 'discardInstead', 'domainWhitelist']);
+  const data = await chrome.storage.local.get(['tabThreshold', 'discardInstead', 'domainWhitelist', 'tabPolicy']);
   const thresholdInput = document.getElementById('optThreshold');
   const discardCheckbox = document.getElementById('optDiscard');
   const whitelistArea = document.getElementById('optWhitelist');
   const statusEl = document.getElementById('optStatus');
 
+  // Policy radios
+  const policyRadios = Array.from(document.querySelectorAll('input[name="policy"]'));
+
   thresholdInput.value = data.tabThreshold || 20;
   discardCheckbox.checked = !!data.discardInstead;
+  const policy = data.tabPolicy || 'block';
+  policyRadios.forEach(r => { r.checked = (r.value === policy); });
+
   if (Array.isArray(data.domainWhitelist) && data.domainWhitelist.length > 0) {
-    whitelistArea.value = data.domainWhitelist.join('\n');
+    whitelistArea.value = data.domainWhitelist.join('\\n');
   } else {
     whitelistArea.value = '';
   }
@@ -26,20 +31,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const discardVal = discardCheckbox.checked;
     const whitelistLines = whitelistArea.value
-      .split(/\n/)
+      .split(/\\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    // Normalize domains to lowercase
     const domains = whitelistLines.map((d) => d.toLowerCase());
+
+    const selectedPolicy = (policyRadios.find(r => r.checked) || {value:'block'}).value;
+
     await chrome.storage.local.set({
       tabThreshold: thresholdVal,
       discardInstead: discardVal,
-      domainWhitelist: domains
+      domainWhitelist: domains,
+      tabPolicy: selectedPolicy
     });
     statusEl.textContent = '保存しました。';
     statusEl.style.color = '#555';
-    setTimeout(() => {
-      statusEl.textContent = '';
-    }, 3000);
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
   });
 });

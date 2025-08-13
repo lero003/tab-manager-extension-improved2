@@ -1,60 +1,104 @@
 /* Styles for the options page */
 
+:root {
+  --bg: #fafafa;
+  --card: #fff;
+  --border: #e5e7eb;
+  --text: #111827;
+  --subtext: #6b7280;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+}
+
+* { box-sizing: border-box; }
+
 body {
-  font-family: sans-serif;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 14px;
   margin: 0;
   padding: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
 #container {
-  padding: 20px;
-  max-width: 480px;
+  padding: 24px;
+  max-width: 560px;
   margin: 0 auto;
 }
 
 h1 {
-  font-size: 20px;
-  margin-bottom: 16px;
+  font-size: 22px;
+  margin: 0 0 16px 0;
+}
+
+h2 {
+  font-size: 16px;
+  margin: 0 0 8px 0;
 }
 
 .section {
   margin-bottom: 16px;
 }
 
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+
 label {
-  font-weight: bold;
+  font-weight: 600;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.radio {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
 }
 
 input[type="number"] {
-  width: 80px;
-  padding: 4px;
-  margin-left: 4px;
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
 }
 
 textarea {
   width: 100%;
-  padding: 4px;
-  font-family: monospace;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 button {
-  padding: 8px 12px;
-  background-color: #4285f4;
+  padding: 10px 14px;
+  background-color: var(--primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 9px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
 }
 
 button:hover {
-  background-color: #357ae8;
+  background-color: var(--primary-hover);
 }
 
 .status {
   margin-top: 10px;
   font-size: 13px;
-  color: #555;
+  color: var(--subtext);
 }

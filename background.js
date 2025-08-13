@@ -1,114 +1,175 @@
 /*
  * Background service worker for the Advanced Tab Manager extension.
  *
- * Responsibilities:
- * - Maintain a record of when each tab was last activated.  This allows
- *   the extension to automatically close the least recently used tabs
- *   when the total number of tabs exceeds a configurable threshold.
- * - Respond to messages from the popup UI to provide information about
- *   open tabs, save or restore sessions, group tabs by domain, remove
- *   duplicates, and adjust preferences.
+ * Added in v1.1:
+ * - New preference "tabPolicy": "trim" (close oldest) or "block" (prevent new tabs).
+ * - When "block" and the threshold would be exceeded, the newly created tab is closed immediately
+ *   and a throttled notification is shown. Also the action badge shows "MAX".
  */
 
 const DEFAULT_THRESHOLD = 20;
+const DEFAULT_POLICY = 'block'; // 'trim' | 'block'
 
-// A simple in‑memory map of tabId -> timestamp (milliseconds) recording
-// the last time a tab was activated.  This map is not persisted across
-// browser restarts; however, persisting it is not critical for the
-// trimming feature because new tabs start with no activity and will
-// naturally be the first to be closed if the threshold is exceeded.
+// In‑memory maps
 const tabActivity = {};
-
-// Cached preferences; values will be loaded from storage at startup and
-// kept in sync through the storage.onChanged listener.
 let tabThreshold = DEFAULT_THRESHOLD;
+let tabPolicy = DEFAULT_POLICY;
 let domainWhitelist = [];
 let discardInstead = false;
 
-// Variables used for time tracking.  When a tab becomes active we
-// record the timestamp; when it loses focus or is closed we update
-// domainTimes to reflect the elapsed time spent on that tab.
+// Time tracking
 let currentActiveTabId = null;
-const tabActiveStart = {}; // tabId -> timestamp when activated
-const tabDomains = {}; // tabId -> last known domain
-let domainTimes = {}; // domain -> cumulative active time in milliseconds
+const tabActiveStart = {};
+const tabDomains = {};
+let domainTimes = {};
 
-// Initialise default preferences on installation and upgrades
+// Notification throttle
+let lastBlockNoticeAt = 0;
+const BLOCK_NOTICE_COOLDOWN_MS = 10000;
+
+// Initialise defaults on installation / upgrade
 chrome.runtime.onInstalled.addListener(async () => {
-  const data = await chrome.storage.local.get(['tabThreshold', 'savedSessions']);
+  const data = await chrome.storage.local.get([
+    'tabThreshold',
+    'savedSessions',
+    'tabPolicy',
+    'domainWhitelist',
+    'discardInstead',
+    'domainTimes'
+  ]);
   if (typeof data.tabThreshold === 'undefined') {
     await chrome.storage.local.set({ tabThreshold: DEFAULT_THRESHOLD });
+  }
+  if (typeof data.tabPolicy === 'undefined') {
+    await chrome.storage.local.set({ tabPolicy: DEFAULT_POLICY });
   }
   if (!Array.isArray(data.savedSessions)) {
     await chrome.storage.local.set({ savedSessions: [] });
   }
-
-  // Set up other default values if not present
-  const other = await chrome.storage.local.get(['domainWhitelist', 'discardInstead', 'domainTimes']);
-  if (!Array.isArray(other.domainWhitelist)) {
+  if (!Array.isArray(data.domainWhitelist)) {
     await chrome.storage.local.set({ domainWhitelist: [] });
   }
-  if (typeof other.discardInstead === 'undefined') {
+  if (typeof data.discardInstead === 'undefined') {
     await chrome.storage.local.set({ discardInstead: false });
   }
-  if (typeof other.domainTimes === 'undefined') {
+  if (typeof data.domainTimes === 'undefined') {
     await chrome.storage.local.set({ domainTimes: {} });
   }
 });
 
-// Load threshold from storage when the service worker starts up
-(async function loadThreshold() {
-  const { tabThreshold: stored } = await chrome.storage.local.get('tabThreshold');
-  tabThreshold = stored || DEFAULT_THRESHOLD;
-  const prefs = await chrome.storage.local.get(['domainWhitelist', 'discardInstead', 'domainTimes']);
+// Load cached prefs at startup
+(async function loadPrefs() {
+  const prefs = await chrome.storage.local.get([
+    'tabThreshold',
+    'tabPolicy',
+    'domainWhitelist',
+    'discardInstead',
+    'domainTimes'
+  ]);
+  tabThreshold = prefs.tabThreshold || DEFAULT_THRESHOLD;
+  tabPolicy = prefs.tabPolicy || DEFAULT_POLICY;
   domainWhitelist = Array.isArray(prefs.domainWhitelist) ? prefs.domainWhitelist : [];
   discardInstead = prefs.discardInstead || false;
   domainTimes = prefs.domainTimes || {};
+  updateBadge();
 })();
 
-// Update cached threshold when storage changes
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes.tabThreshold) {
-    tabThreshold = changes.tabThreshold.newValue;
-  }
-  if (areaName === 'local' && changes.domainWhitelist) {
+// Keep cache in sync
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if (changes.tabThreshold) tabThreshold = changes.tabThreshold.newValue;
+  if (changes.tabPolicy) tabPolicy = changes.tabPolicy.newValue;
+  if (changes.domainWhitelist) {
     domainWhitelist = Array.isArray(changes.domainWhitelist.newValue)
       ? changes.domainWhitelist.newValue
       : [];
   }
-  if (areaName === 'local' && changes.discardInstead) {
-    discardInstead = changes.discardInstead.newValue || false;
-  }
-  if (areaName === 'local' && changes.domainTimes) {
-    domainTimes = changes.domainTimes.newValue || {};
-  }
+  if (changes.discardInstead) discardInstead = !!changes.discardInstead.newValue;
+  if (changes.domainTimes) domainTimes = changes.domainTimes.newValue || {};
+  updateBadge();
 });
 
-// Update activity when a tab becomes active
+// Update badge with current policy state
+async function updateBadge() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    const total = tabs.length;
+    let text = '';
+    if (tabPolicy === 'block' && total >= (tabThreshold || DEFAULT_THRESHOLD)) {
+      text = 'MAX';
+    } else if (total && tabThreshold) {
+      text = String(Math.min(99, Math.ceil((total / tabThreshold) * 9)));
+      // single-digit "meter" from 1..9 (optional visual)
+    }
+    await chrome.action.setBadgeText({ text });
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Activity & time tracking
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   tabActivity[tabId] = Date.now();
-  // Handle time tracking when switching tabs
   handleTabSwitch(tabId);
-  checkTabCount();
+  if (tabPolicy === 'trim') checkTabCount();
+  updateBadge();
 });
 
-// Record activity when new tabs are created
-chrome.tabs.onCreated.addListener((tab) => {
-  tabActivity[tab.id] = Date.now();
-  // Mark the domain for the new tab if possible
+// On created: for "block" policy, immediately close if exceeding threshold
+chrome.tabs.onCreated.addListener(async (tab) => {
   try {
+    // record domain if known
     if (tab.url) {
-      const domain = new URL(tab.url).hostname;
-      tabDomains[tab.id] = domain;
+      try {
+        const domain = new URL(tab.url).hostname;
+        tabDomains[tab.id] = domain;
+      } catch (e) {}
     }
-  } catch (e) {}
-  checkTabCount();
+    if (tabPolicy === 'block') {
+      const tabs = await chrome.tabs.query({});
+      const total = tabs.length;
+      if (tabThreshold && total > tabThreshold) {
+        // Close the newborn tab unless it is pinned (rare) or whitelisted (if URL known)
+        let allow = false;
+        if (tab.pinned) allow = true;
+        if (tab.url) {
+          try {
+            const d = new URL(tab.url).hostname;
+            if (domainWhitelist.includes(d)) allow = true;
+          } catch (e) {}
+        }
+        if (!allow) {
+          try { await chrome.tabs.remove(tab.id); } catch (e) {}
+          // Throttled notification
+          const now = Date.now();
+          if (now - lastBlockNoticeAt > BLOCK_NOTICE_COOLDOWN_MS) {
+            lastBlockNoticeAt = now;
+            try {
+              await chrome.notifications.create('', {
+                type: 'basic',
+                title: 'タブ上限に達しました',
+                message: `上限（${tabThreshold}）を超える新規タブはブロックされています。上限を上げるか、不要なタブを閉じてください。`,
+                iconUrl: 'icons/icon128.png'
+              });
+            } catch (e) {}
+          }
+          updateBadge();
+          return; // do not record activity for the blocked tab
+        }
+      }
+    }
+    // For both policies, record activity for tabs that remain
+    tabActivity[tab.id] = Date.now();
+    if (tabPolicy === 'trim') checkTabCount();
+    updateBadge();
+  } catch (e) {
+    // ignore
+  }
 });
 
-// Remove activity record when a tab is closed
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+// Cleanup on removed
+chrome.tabs.onRemoved.addListener(async (tabId) => {
   delete tabActivity[tabId];
-  // When a tab is closed, if it was the active one, record the time spent
   if (tabId === currentActiveTabId) {
     const now = Date.now();
     const start = tabActiveStart[tabId] || now;
@@ -116,18 +177,18 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     const domain = tabDomains[tabId];
     if (domain) {
       domainTimes[domain] = (domainTimes[domain] || 0) + delta;
-      chrome.storage.local.set({ domainTimes });
+      await chrome.storage.local.set({ domainTimes });
     }
     currentActiveTabId = null;
   }
   delete tabActiveStart[tabId];
   delete tabDomains[tabId];
+  updateBadge();
 });
 
-// When the focused window changes we treat it as leaving the previous tab.
+// Window focus changed -> record time
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    // The browser lost focus (user switched to another app); record time for current tab
     if (currentActiveTabId !== null) {
       const now = Date.now();
       const start = tabActiveStart[currentActiveTabId] || now;
@@ -142,13 +203,6 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   }
 });
 
-/**
- * Handles switching from the currently active tab to a new tab.  Records
- * time spent on the previous tab and updates the start time for the new
- * tab.
- * @param {number|null} newTabId The ID of the newly activated tab, or
- *     null if no tab is currently active (e.g. when a window loses focus).
- */
 async function handleTabSwitch(newTabId) {
   const now = Date.now();
   if (currentActiveTabId !== null && currentActiveTabId !== newTabId) {
@@ -173,31 +227,22 @@ async function handleTabSwitch(newTabId) {
 }
 
 /**
- * Checks the total number of open tabs across all windows. If the count
- * exceeds the configured threshold, the least recently activated tabs
- * (excluding pinned tabs) will be closed until the count is at or below
- * the threshold.
+ * For "trim" policy: close least‑recently used tabs until within threshold.
  */
 async function checkTabCount() {
+  if (tabPolicy !== 'trim') return;
   try {
     const tabs = await chrome.tabs.query({});
-    if (!tabThreshold || tabs.length <= tabThreshold) {
-      return;
-    }
-    // Exclude pinned tabs and whitelisted domains from automatic trimming
+    if (!tabThreshold || tabs.length <= tabThreshold) return;
+
     const closable = [];
     for (const t of tabs) {
       if (t.pinned) continue;
       let domain = '';
-      try {
-        domain = new URL(t.url).hostname;
-      } catch (e) {}
-      if (domain && domainWhitelist.includes(domain)) {
-        continue;
-      }
+      try { domain = new URL(t.url).hostname; } catch (e) {}
+      if (domain && domainWhitelist.includes(domain)) continue;
       closable.push(t);
     }
-    // Sort by last activity ascending (oldest first)
     closable.sort((a, b) => {
       const aTime = tabActivity[a.id] || 0;
       const bTime = tabActivity[b.id] || 0;
@@ -207,30 +252,19 @@ async function checkTabCount() {
     for (const tab of closable) {
       if (excess <= 0) break;
       try {
-        if (discardInstead) {
-          await chrome.tabs.discard(tab.id);
-        } else {
-          await chrome.tabs.remove(tab.id);
-        }
+        if (discardInstead) { await chrome.tabs.discard(tab.id); }
+        else { await chrome.tabs.remove(tab.id); }
         delete tabActivity[tab.id];
         delete tabActiveStart[tab.id];
         delete tabDomains[tab.id];
         if (currentActiveTabId === tab.id) currentActiveTabId = null;
         excess--;
-      } catch (err) {
-        // ignore failures
-      }
+      } catch (e) {}
     }
-  } catch (err) {
-    // ignore errors silently
-  }
+  } catch (e) {}
 }
 
-/**
- * Handles messages from the popup. Because Chrome's messaging API is
- * callback‑based, we use async functions and return true to indicate
- * that the response will be sent asynchronously.
- */
+// Message handlers
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.command) {
     case 'getSummary':
@@ -249,7 +283,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'groupByDomain':
       (async () => {
         try {
-          // Only group tabs in the current window to avoid moving tabs between windows unexpectedly
           const tabs = await chrome.tabs.query({ currentWindow: true });
           const groups = {};
           for (const tab of tabs) {
@@ -258,9 +291,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               const domain = urlObj.hostname;
               if (!groups[domain]) groups[domain] = [];
               groups[domain].push(tab.id);
-            } catch (e) {
-              // skip tabs with invalid URLs (e.g., about:blank)
-            }
+            } catch (e) {}
           }
           for (const domain of Object.keys(groups)) {
             const ids = groups[domain];
@@ -283,14 +314,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const toRemove = [];
         for (const tab of tabs) {
           const url = tab.url || '';
-          if (seen[url]) {
-            toRemove.push(tab.id);
-          } else {
-            seen[url] = tab.id;
-          }
+          if (seen[url]) toRemove.push(tab.id);
+          else seen[url] = tab.id;
         }
         if (toRemove.length > 0) {
-          await chrome.tabs.remove(toRemove);
+          if (discardInstead) {
+            for (const id of toRemove) { try { await chrome.tabs.discard(id); } catch (e) {} }
+          } else {
+            await chrome.tabs.remove(toRemove);
+          }
         }
         sendResponse({ closed: toRemove.length });
       })();
@@ -318,7 +350,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         const data = await chrome.storage.local.get('savedSessions');
         const sessions = Array.isArray(data.savedSessions) ? data.savedSessions : [];
-        // sort by creation time descending
         sessions.sort((a, b) => b.created - a.created);
         sendResponse({ sessions });
       })();
@@ -343,7 +374,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const session = sessions.find((s) => s.id === id);
         if (session) {
           const urls = session.tabs.map((t) => t.url);
-          // Create a new window with the session's tabs
           await chrome.windows.create({ url: urls });
           sendResponse({ ok: true });
         } else {
@@ -374,28 +404,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const newThreshold = parseInt(message.value, 10);
         if (!isNaN(newThreshold) && newThreshold > 0) {
           await chrome.storage.local.set({ tabThreshold: newThreshold });
+          updateBadge();
           sendResponse({ ok: true, threshold: newThreshold });
         } else {
           sendResponse({ ok: false, error: 'Invalid threshold' });
-        }
-      })();
-      return true;
-
-    case 'exportCurrentTabs':
-      (async () => {
-        try {
-          const tabs = await chrome.tabs.query({});
-          const session = {
-            name: `Current_${new Date().toISOString().replace(/[:T]/g, '-').split('.')[0]}`,
-            created: Date.now(),
-            tabs: tabs.map((t) => ({ url: t.url, title: t.title || '', pinned: !!t.pinned }))
-          };
-          const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          await chrome.downloads.download({ url, filename: `${session.name}.json`, saveAs: true });
-          sendResponse({ ok: true });
-        } catch (e) {
-          sendResponse({ ok: false, error: e.message });
         }
       })();
       return true;
@@ -407,9 +419,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })();
       return true;
 
+    case 'getPolicy':
+      (async () => {
+        const { tabPolicy: pol } = await chrome.storage.local.get('tabPolicy');
+        sendResponse({ policy: pol || DEFAULT_POLICY });
+      })();
+      return true;
+
+    case 'updatePolicy':
+      (async () => {
+        const val = message.value === 'trim' ? 'trim' : 'block';
+        await chrome.storage.local.set({ tabPolicy: val });
+        updateBadge();
+        sendResponse({ ok: true, policy: val });
+      })();
+      return true;
+
     case 'getDomainStats':
       (async () => {
-        // Return the accumulated active times per domain.  Sort by time descending.
         const entries = Object.entries(domainTimes).map(([domain, ms]) => ({ domain, ms }));
         entries.sort((a, b) => b.ms - a.ms);
         sendResponse({ stats: entries });
@@ -423,7 +450,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: false, error: 'Invalid session format' });
           return;
         }
-        // Assign a new ID and timestamp to the imported session
         const imported = {
           id: Date.now(),
           name: session.name && session.name.trim() ? session.name.trim() : new Date().toLocaleString(),
@@ -439,15 +465,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     default:
-      // Unknown command
       sendResponse({ error: 'Unknown command' });
       return false;
   }
 });
 
-// Respond to keyboard shortcut commands defined in manifest.  These commands
-// perform actions without any UI feedback.  They reuse the same logic as
-// the message handlers above but do not send responses.
+// Keyboard shortcuts: unaffected except that "remove-duplicates" respects discardInstead.
 chrome.commands.onCommand.addListener(async (command) => {
   switch (command) {
     case 'group-by-domain':
@@ -468,9 +491,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             await chrome.tabGroups.update(group.id, { title: domain, color: 'blue' });
           }
         }
-      } catch (e) {
-        // silently ignore errors
-      }
+      } catch (e) {}
       break;
     case 'save-session':
       try {
@@ -485,9 +506,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         const sessions = Array.isArray(data.savedSessions) ? data.savedSessions : [];
         sessions.push(session);
         await chrome.storage.local.set({ savedSessions: sessions });
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       break;
     case 'remove-duplicates':
       try {
@@ -496,24 +515,17 @@ chrome.commands.onCommand.addListener(async (command) => {
         const toRemove = [];
         for (const tab of tabs) {
           const url = tab.url || '';
-          if (seen[url]) {
-            toRemove.push(tab.id);
-          } else {
-            seen[url] = tab.id;
-          }
+          if (seen[url]) toRemove.push(tab.id);
+          else seen[url] = tab.id;
         }
         if (toRemove.length > 0) {
           if (discardInstead) {
-            for (const id of toRemove) {
-              await chrome.tabs.discard(id);
-            }
+            for (const id of toRemove) { try { await chrome.tabs.discard(id); } catch (e) {} }
           } else {
             await chrome.tabs.remove(toRemove);
           }
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       break;
     default:
       break;
